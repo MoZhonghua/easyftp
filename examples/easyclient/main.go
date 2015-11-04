@@ -1,6 +1,6 @@
 package main
 
-import "easyftp"
+import "github.com/MoZhonghua/easyftp"
 import "io"
 import "os"
 import "fmt"
