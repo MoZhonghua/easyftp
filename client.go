@@ -8,14 +8,14 @@ import "strconv"
 
 // This is a simple FTP client
 // NOTE: this client is designed for single-threaded usage, if you
-//       want to download/upload multiple files parallelly, you should 
+//       want to download/upload multiple files parallelly, you should
 //       create multiple clients.
-// NOTE: file uploading/downloading are done in binary mode, and can't 
-//       be changed by Client.Type() because we reset mode to binary before 
+// NOTE: file uploading/downloading are done in binary mode, and can't
+//       be changed by Client.Type() because we reset mode to binary before
 //       uploading/downloading.
 type Client struct {
 	// Ftp connection, we make this visible for easier extension
-	Conn   *Conn
+	Conn   *ControlConn
 	Debug  bool
 	server string
 }
@@ -44,7 +44,7 @@ func (c *Client) Dial(server string, port int) error {
 	if err != nil {
 		return err
 	}
-	c.Conn = NewConn(conn, c.Debug)
+	c.Conn = NewControlConn(conn, c.Debug)
 	c.server = server
 
 	_, _, err = c.Conn.ReadResponse()
@@ -291,13 +291,12 @@ func (c *Client) pasvMode() (port int, err error) {
 	return port, nil
 }
 
-func (c *Client) newDataConn(port int) (*Conn, error) {
+func (c *Client) newDataConn(port int) (*DataConn, error) {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.server, port))
 	if err != nil {
 		return nil, err
 	}
 
-	dataConn := NewConn(conn, c.Debug)
-	dataConn.control = c.Conn
+	dataConn := NewDataConn(c.Conn, conn)
 	return dataConn, nil
 }

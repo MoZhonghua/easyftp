@@ -9,7 +9,7 @@ var _ = io.Copy
 var _ = os.Stderr
 
 func uploadFile(c *easyftp.Client, from string, to string) {
-	r, err := os.Open(from)	
+	r, err := os.Open(from)
 	if err != nil {
 		fmt.Println("failed to open upload local file:", err)
 		return
@@ -24,7 +24,7 @@ func uploadFile(c *easyftp.Client, from string, to string) {
 }
 
 func abortedDownloadFile(c *easyftp.Client, from string, to string) {
-	w, err := os.Create(to)	
+	w, err := os.Create(to)
 	if err != nil {
 		fmt.Println("failed to open download dest file:", err)
 		return
@@ -46,7 +46,7 @@ func abortedDownloadFile(c *easyftp.Client, from string, to string) {
 }
 
 func downloadFile(c *easyftp.Client, from string, to string) {
-	w, err := os.Create(to)	
+	w, err := os.Create(to)
 	if err != nil {
 		fmt.Println("failed to open download dest file:", err)
 		return

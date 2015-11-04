@@ -3,7 +3,6 @@ package easyftp
 import "net"
 import "fmt"
 import "os"
-// import "io"
 import "bytes"
 import "strconv"
 import "errors"
@@ -18,23 +17,51 @@ var (
 	crnl  = []byte{'\r', '\n'}
 )
 
+type DataConn struct {
+	control *ControlConn
+	conn    net.Conn
+}
+
+func NewDataConn(control *ControlConn, conn net.Conn) *DataConn {
+	return &DataConn{
+		control: control,
+		conn:    conn,
+	}
+}
+
+func (c *DataConn) Close() error {
+	err := c.conn.Close()
+	// Since we're DTP, we need read the result from control connection
+	code, msg, err2 := c.control.ReadResponse()
+	if err2 != nil {
+		err = err2
+	}
+	if code != 226 {
+		err = NewUnexpectedCodeError(code, msg)
+	}
+	return err
+}
+
+func (c *DataConn) Read(b []byte) (int, error) {
+	return c.conn.Read(b)
+}
+
+func (c *DataConn) Write(b []byte) (int, error) {
+	return c.conn.Write(b)
+}
+
 // We make this class public to make extension easier, so if you are not intrest
 // in this, you can ignore the details and use Client only
-type Conn struct {
+type ControlConn struct {
 	Debug     bool
 	conn      net.Conn
 	cmdBuf    []byte
 	respLine  []byte
 	availData []byte
-
-	// If this is not nil, we'ar a data connection,
-	// when we're closed, we need read the result from
-	// control connection
-	control *Conn
 }
 
-func NewConn(conn net.Conn, debug bool) *Conn {
-	c := new(Conn)
+func NewControlConn(conn net.Conn, debug bool) *ControlConn {
+	c := new(ControlConn)
 	c.Debug = debug
 	c.conn = conn
 	c.cmdBuf = make([]byte, maxCmdLength)
@@ -43,30 +70,12 @@ func NewConn(conn net.Conn, debug bool) *Conn {
 	return c
 }
 
-func (c *Conn) Close() error {
+func (c *ControlConn) Close() error {
 	err := c.conn.Close()
-	// If we're DTP, we need read the result from control connection
-	if c.control != nil {
-		code, msg, err2 := c.control.ReadResponse()
-		if err2 != nil {
-			err = err2
-		}
-		if code != 226 {
-			err = NewUnexpectedCodeError(code, msg)
-		}
-	}
 	return err
 }
 
-func (c *Conn) Read(b []byte) (int, error) {
-	return c.conn.Read(b)
-}
-
-func (c *Conn) Write(b []byte) (int, error) {
-	return c.conn.Write(b)
-}
-
-func (c *Conn) SendCommand(cmd string, msg string) error {
+func (c *ControlConn) SendCommand(cmd string, msg string) error {
 	cmdFullLen := len(cmd) + len(msg) + len(space) + len(crnl)
 	if cmdFullLen > maxCmdLength {
 		return errors.New("command is too long")
@@ -91,7 +100,7 @@ func (c *Conn) SendCommand(cmd string, msg string) error {
 	return err
 }
 
-func (c *Conn) ReadResponse() (code int, msg string, err error) {
+func (c *ControlConn) ReadResponse() (code int, msg string, err error) {
 	c.availData = c.respLine[:0]
 	received := 0
 	crnlPos := 0
