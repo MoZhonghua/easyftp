@@ -101,7 +101,7 @@ func (c *Client) Mkd(dir string) (msg string, err error) {
 	if err != nil {
 		return "", err
 	}
-	if code != 250 {
+	if code != 257 {
 		return "", NewUnexpectedCodeError(code, msg)
 	}
 
