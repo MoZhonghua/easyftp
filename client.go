@@ -3,7 +3,6 @@ package easyftp
 import "net"
 import "fmt"
 import "io"
-import "errors"
 import "strings"
 import "strconv"
 
@@ -259,29 +258,33 @@ func (c *Client) pasvMode() (port int, err error) {
 		return -1, err
 	}
 
-	if code != 227 || len(msg) == 0 {
-		return -1, errors.New("invalid response for PASV command")
+	if code != 227 {
+		return -1, NewUnexpectedCodeError(code, msg)
+	}
+
+	if len(msg) == 0 {
+		return -1, NewInvalidRespMsgError("PASV", "msg too short", msg)
 	}
 
 	// 227 Entering passive mode (127,0,0,1,206,177).
 	start := strings.Index(msg, "(")
 	end := strings.Index(msg, ")")
 	if start == -1 || end == -1 {
-		return -1, errors.New("invalid port info for PASV commmand")
+		return -1, NewInvalidRespMsgError("PASV", "port not found", msg)
 	}
 
 	nums := strings.Split(msg[start:end], ",")
 	if len(nums) != 6 {
-		return -1, errors.New("invalid port info for PASV command")
+		return -1, NewInvalidRespMsgError("PASV", "invalid port info", msg)
 	}
 
 	high, err := strconv.Atoi(nums[4])
 	if err != nil {
-		return -1, errors.New("invalid high port part for PASV command")
+		return -1, NewInvalidRespMsgError("PASV", "invalid port info", msg)
 	}
 	low, err := strconv.Atoi(nums[5])
 	if err != nil {
-		return -1, errors.New("invalid low port part for PASV command")
+		return -1, NewInvalidRespMsgError("PASV", "invalid port info", msg)
 	}
 
 	port = high*256 + low
@@ -297,53 +300,4 @@ func (c *Client) newDataConn(port int) (*Conn, error) {
 	dataConn := NewConn(conn, c.Debug)
 	dataConn.control = c.Conn
 	return dataConn, nil
-}
-
-func (c *Client) newPasvConn() (*Conn, error) {
-	err := c.Conn.SendCommand("PASV", "")
-	if err != nil {
-		return nil, err
-	}
-
-	code, msg, err := c.Conn.ReadResponse()
-	if err != nil {
-		return nil, err
-	}
-	
-	if code != 227 {
-		return nil, NewUnexpectedCodeError(code, msg)
-	}
-
-	if len(msg) == 0 {
-		return nil, NewInvalidRespMsgError("PASV", "msg too short", msg)
-	}
-
-	// 227 Entering passive mode (127,0,0,1,206,177).
-	start := strings.Index(msg, "(")
-	end := strings.Index(msg, ")")
-	if start == -1 || end == -1 {
-		return nil, NewInvalidRespMsgError("PASV", "port not found", msg)
-	}
-
-	nums := strings.Split(msg[start:end], ",")
-	if len(nums) != 6 {
-		return nil, NewInvalidRespMsgError("PASV", "invalid port info", msg)
-	}
-
-	high, err := strconv.Atoi(nums[4])
-	if err != nil {
-		return nil, NewInvalidRespMsgError("PASV", "invalid port info", msg)
-	}
-	low, err := strconv.Atoi(nums[5])
-	if err != nil {
-		return nil, NewInvalidRespMsgError("PASV", "invalid port info", msg)
-	}
-
-	port := high*256 + low
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.server, port))
-	if err != nil {
-		return nil, err
-	}
-
-	return NewConn(conn, c.Debug), nil
 }
