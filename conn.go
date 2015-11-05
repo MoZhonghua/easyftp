@@ -57,7 +57,6 @@ type ControlConn struct {
 	conn      net.Conn
 	cmdBuf    []byte
 	respLine  []byte
-	availData []byte
 }
 
 func NewControlConn(conn net.Conn, debug bool) *ControlConn {
@@ -66,7 +65,6 @@ func NewControlConn(conn net.Conn, debug bool) *ControlConn {
 	c.conn = conn
 	c.cmdBuf = make([]byte, maxCmdLength)
 	c.respLine = make([]byte, maxRespLineLength)
-	c.availData = c.respLine[:0]
 	return c
 }
 
@@ -101,7 +99,6 @@ func (c *ControlConn) SendCommand(cmd string, msg string) error {
 }
 
 func (c *ControlConn) ReadResponse() (code int, msg string, err error) {
-	c.availData = c.respLine[:0]
 	received := 0
 	crnlPos := 0
 	line := c.respLine[:0]
@@ -127,8 +124,6 @@ func (c *ControlConn) ReadResponse() (code int, msg string, err error) {
 	if c.Debug {
 		fmt.Fprintf(os.Stderr, "%p recv: %s\n", c, string(line))
 	}
-
-	c.availData = c.respLine[crnlPos+2 : received]
 
 	if len(line) < 3 {
 		return -1, "", errors.New("response is too short")
